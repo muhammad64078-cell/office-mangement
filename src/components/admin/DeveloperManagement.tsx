@@ -10,6 +10,8 @@ import {
   Mail,
   User,
   Shield,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 interface Props {
@@ -20,6 +22,7 @@ interface Props {
 export function DeveloperManagement({ developers, onUpdated }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDev, setEditingDev] = useState<Profile | null>(null);
+  const [deletingDev, setDeletingDev] = useState<Profile | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
   const pendingDevs = developers.filter((d) => d.is_approved === false);
@@ -111,12 +114,22 @@ export function DeveloperManagement({ developers, onUpdated }: Props) {
                   <p className="text-xs capitalize text-slate-400">{dev.level ?? "—"} developer</p>
                 </div>
               </div>
-              <button
-                onClick={() => { setEditingDev(dev); setModalOpen(true); }}
-                className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditingDev(dev); setModalOpen(true); }}
+                  className="rounded-lg border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+                  title="Edit Developer"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setDeletingDev(dev)}
+                  className="rounded-lg border border-red-200 bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
+                  title="Remove Developer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
             <div className="mt-4 space-y-2 border-t border-slate-100 pt-4 text-sm">
               <div className="flex items-center justify-between">
@@ -135,6 +148,15 @@ export function DeveloperManagement({ developers, onUpdated }: Props) {
         onClose={() => { setModalOpen(false); setEditingDev(null); }}
         editing={editingDev}
         onSaved={() => onUpdated()}
+      />
+
+      <DeleteDeveloperModal
+        dev={deletingDev}
+        onClose={() => setDeletingDev(null)}
+        onDeleted={() => {
+          setDeletingDev(null);
+          onUpdated();
+        }}
       />
     </div>
   );
@@ -339,6 +361,121 @@ function DeveloperModal({
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function DeleteDeveloperModal({
+  dev,
+  onClose,
+  onDeleted,
+}: {
+  dev: Profile | null;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [typedName, setTypedName] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dev) {
+      setTypedName("");
+      setConfirmed(false);
+      setError(null);
+    }
+  }, [dev]);
+
+  if (!dev) return null;
+
+  const nameMatches = typedName === dev.full_name;
+  const canDelete = nameMatches && confirmed && !deleting;
+
+  const handleDelete = async () => {
+    if (!canDelete) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const { error } = await supabase.from("profiles").delete().eq("id", dev.id);
+      if (error) throw new Error(error.message);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete developer.");
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Modal open={!!dev} onClose={onClose} title="Remove Developer">
+      <div className="space-y-4">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <div className="flex gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
+            <div className="text-sm text-red-900">
+              <p className="font-bold text-red-700 mb-1">Danger Zone</p>
+              <p>
+                You are about to permanently delete <strong>{dev.full_name}</strong>.
+                This action will wipe out all of their attendance records, sessions, and tasks from the system due to database cascade rules.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            Step 1: Type the exact name <span className="font-bold">"{dev.full_name}"</span> to confirm
+          </label>
+          <input
+            type="text"
+            value={typedName}
+            onChange={(e) => setTypedName(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-slate-900 outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+            placeholder={dev.full_name}
+          />
+        </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50 cursor-pointer">
+          <div className="flex h-5 items-center">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-600"
+            />
+          </div>
+          <div className="text-sm">
+            <p className="font-medium text-slate-900">Step 2: Acknowledge Data Loss</p>
+            <p className="text-slate-500 text-xs mt-0.5">I understand that this action is permanent and will delete all attendance and task history for this developer.</p>
+          </div>
+        </label>
+
+        {error && (
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-100">
+            {error}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+            disabled={deleting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={!canDelete}
+            className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-red-500/25 transition hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {deleting ? "Deleting…" : "Permanently Delete"}
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

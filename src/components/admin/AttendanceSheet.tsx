@@ -27,6 +27,7 @@ export function AttendanceSheet({ developers }: Props) {
   const [loading, setLoading] = useState(true);
   const [manualOpen, setManualOpen] = useState(false);
   const [editingAtt, setEditingAtt] = useState<Attendance | null>(null);
+  const [selectedDevId, setSelectedDevId] = useState<string | undefined>(undefined);
 
   const loadDay = useCallback(async () => {
     setLoading(true);
@@ -41,7 +42,9 @@ export function AttendanceSheet({ developers }: Props) {
 
   const loadMonth = useCallback(async () => {
     const start = `${month}-01`;
-    const end = `${month}-31`;
+    const [y, m] = month.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    const end = `${month}-${lastDay.toString().padStart(2, "0")}`;
     const { data } = await supabase
       .from("attendance")
       .select("*")
@@ -152,7 +155,7 @@ export function AttendanceSheet({ developers }: Props) {
           </button>
         </div>
         <button
-          onClick={() => { setEditingAtt(null); setManualOpen(true); }}
+          onClick={() => { setEditingAtt(null); setSelectedDevId(undefined); setManualOpen(true); }}
           className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-2.5 text-xs sm:text-sm font-medium text-white shadow-lg shadow-sky-500/25 transition hover:shadow-sky-500/40"
         >
           <Plus className="h-4 w-4" /> Manual Attendance
@@ -179,8 +182,8 @@ export function AttendanceSheet({ developers }: Props) {
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
                     <th className="px-5 py-3 font-medium">Developer</th>
-                    <th className="px-5 py-3 font-medium">First Check-in</th>
-                    <th className="px-5 py-3 font-medium">Final Check-out</th>
+                    <th className="px-5 py-3 font-medium">Session 1</th>
+                    <th className="px-5 py-3 font-medium">Session 2</th>
                     <th className="px-5 py-3 font-medium">Net Work Hours</th>
                     <th className="px-5 py-3 font-medium">Break Hours</th>
                     <th className="px-5 py-3 font-medium">Status</th>
@@ -204,8 +207,28 @@ export function AttendanceSheet({ developers }: Props) {
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-slate-600">{formatTime(r?.check_in ?? null)}</td>
-                        <td className="px-5 py-3 text-slate-600">{formatTime(r?.check_out ?? null)}</td>
+                        <td className="px-5 py-3 text-slate-600">
+                          {(() => {
+                            const s1 = r?.sessions?.[0] || (r?.check_in ? { check_in: r.check_in, check_out: r.check_out } : null);
+                            return s1 ? (
+                              <div className="text-[11px] leading-tight">
+                                <span className="text-sky-600 font-semibold">In:</span> {formatTime(s1.check_in)} <br />
+                                <span className="text-amber-600 font-semibold">Out:</span> {formatTime(s1.check_out)}
+                              </div>
+                            ) : <span className="text-slate-300">—</span>;
+                          })()}
+                        </td>
+                        <td className="px-5 py-3 text-slate-600">
+                          {(() => {
+                            const s2 = r?.sessions?.[1];
+                            return s2 ? (
+                              <div className="text-[11px] leading-tight">
+                                <span className="text-sky-600 font-semibold">In:</span> {formatTime(s2.check_in)} <br />
+                                <span className="text-amber-600 font-semibold">Out:</span> {formatTime(s2.check_out)}
+                              </div>
+                            ) : <span className="text-slate-300">—</span>;
+                          })()}
+                        </td>
                         <td className="px-5 py-3 text-slate-600 font-semibold">{formatHours(r?.total_hours ?? null)}</td>
                         <td className="px-5 py-3 text-amber-700 font-medium">{r?.total_break_hours ? `${r.total_break_hours}h` : "0.00h"}</td>
                         <td className="px-5 py-3">
@@ -237,12 +260,19 @@ export function AttendanceSheet({ developers }: Props) {
                           )}
                         </td>
                         <td className="px-5 py-3">
-                          {r && (
+                          {r ? (
                             <button
-                              onClick={() => { setEditingAtt(r); setManualOpen(true); }}
+                              onClick={() => { setEditingAtt(r); setSelectedDevId(r.user_id); setManualOpen(true); }}
                               className="text-xs font-medium text-sky-600 hover:underline"
                             >
                               Edit / Sessions
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setEditingAtt(null); setSelectedDevId(dev.id); setManualOpen(true); }}
+                              className="text-xs font-medium text-sky-600 hover:underline flex items-center gap-1"
+                            >
+                              <Plus className="h-3 w-3" /> Add Attendance
                             </button>
                           )}
                         </td>
@@ -286,12 +316,28 @@ export function AttendanceSheet({ developers }: Props) {
                     {r ? (
                       <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-xl p-2.5 text-xs">
                         <div>
-                          <span className="text-slate-400 block text-[10px]">First In</span>
-                          <span className="font-medium text-slate-700">{formatTime(r.check_in)}</span>
+                          <span className="text-slate-400 block text-[10px]">Session 1</span>
+                          {(() => {
+                            const s1 = r?.sessions?.[0] || (r?.check_in ? { check_in: r.check_in, check_out: r.check_out } : null);
+                            return s1 ? (
+                              <div className="text-[11px] text-slate-700 leading-tight mt-0.5">
+                                <span className="text-sky-600 font-medium">In:</span> {formatTime(s1.check_in)} <br/>
+                                <span className="text-amber-600 font-medium">Out:</span> {formatTime(s1.check_out)}
+                              </div>
+                            ) : <span className="text-slate-400">—</span>;
+                          })()}
                         </div>
                         <div>
-                          <span className="text-slate-400 block text-[10px]">Final Out</span>
-                          <span className="font-medium text-slate-700">{formatTime(r.check_out)}</span>
+                          <span className="text-slate-400 block text-[10px]">Session 2</span>
+                          {(() => {
+                            const s2 = r?.sessions?.[1];
+                            return s2 ? (
+                              <div className="text-[11px] text-slate-700 leading-tight mt-0.5">
+                                <span className="text-sky-600 font-medium">In:</span> {formatTime(s2.check_in)} <br/>
+                                <span className="text-amber-600 font-medium">Out:</span> {formatTime(s2.check_out)}
+                              </div>
+                            ) : <span className="text-slate-400">—</span>;
+                          })()}
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[10px]">Net Work Hours</span>
@@ -315,12 +361,19 @@ export function AttendanceSheet({ developers }: Props) {
                           )}
                         </div>
                       ) : <span />}
-                      {r && (
+                      {r ? (
                         <button
-                          onClick={() => { setEditingAtt(r); setManualOpen(true); }}
+                          onClick={() => { setEditingAtt(r); setSelectedDevId(r.user_id); setManualOpen(true); }}
                           className="font-medium text-sky-600 hover:underline"
                         >
                           Edit / Sessions
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => { setEditingAtt(null); setSelectedDevId(dev.id); setManualOpen(true); }}
+                          className="font-medium text-sky-600 hover:underline flex items-center gap-1"
+                        >
+                          <Plus className="h-3 w-3" /> Add Attendance
                         </button>
                       )}
                     </div>
@@ -394,9 +447,11 @@ export function AttendanceSheet({ developers }: Props) {
 
       <ManualAttendanceModal
         open={manualOpen}
-        onClose={() => { setManualOpen(false); setEditingAtt(null); }}
+        onClose={() => { setManualOpen(false); setEditingAtt(null); setSelectedDevId(undefined); }}
         developers={developers}
         editing={editingAtt}
+        defaultDate={date}
+        initialUserId={selectedDevId}
         onSaved={() => { loadDay(); loadMonth(); }}
       />
     </div>
