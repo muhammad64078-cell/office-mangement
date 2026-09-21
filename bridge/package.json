@@ -1,0 +1,13 @@
+{
+  "name": "zkteco-bridge",
+  "version": "1.0.0",
+  "description": "Polls a ZKTeco biometric device and forwards punch logs to the Supabase punch edge function.",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-zklib": "^1.0.9"
+  }
+}

@@ -1,0 +1,5 @@
+project_id = "team-attendance-portal"
+
+[functions.punch]
+verify_jwt = false
+entrypoint = "./functions/punch/index.ts"
